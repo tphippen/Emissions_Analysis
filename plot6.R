@@ -1,0 +1,123 @@
+# Exploratory Data Analysis Course Project 2
+# Assignment Goal: explore the National Emissions Inventory database 
+# and see what it say about fine particulate matter pollution in the 
+# United States over the 10-year period 1999–2008
+
+# Datasets: 
+# 1) PM2.5 Emissions Data (summarySCC_PM25.rds): 
+# This file contains a data frame with all of the PM2.5 emissions data 
+# for 1999, 2002, 2005, and 2008. 
+# 2) Source Classification Code Table (Source_Classification_Code.rds): 
+# This table provides a mapping from the SCC digit strings in the Emissions 
+# table to the actual name of the PM2.5 source.
+
+# Question 6: Compare emissions from motor vehicle sources in Baltimore City 
+# with emissions from motor vehicle sources in Los Angeles County, 
+# California (fips == "06037"). Which city has seen greater changes 
+# over time in motor vehicle emissions?
+
+# To answer this question will plot log_10 of total emissions for each year
+# for each city. This will allow for easy comparison of fold change between cities
+# A regression line will be added for each city. This is probably silly since 
+# there are only 4 points per city, and a large amount of variability in the 
+# Baltimore data. However, the slope of the regression line is a rough estimate of 
+# average rate of change. 
+
+# For this analysis, am defining motor vehicle as On-road Vehicles and Engines
+# These vehicles fall into four EI sectors
+# 1) Mobile - On-Road Gasoline Light Duty Vehicles
+# 2) Mobile - On-Road Diesel Light Duty Vehicles
+# 3) Mobile - On-Road Gasoline Heavy Duty Vehicles
+# 4) Mobile - On-Road Diesel Heavy Duty Vehicles
+
+# The following are considered light duty vehicles by the EPA:   
+# "Passenger cars and light trucks: minivans, passenger vans, 
+# pickup trucks, and sport-utility vehicles"
+# Heavy duty vehicles include, "Heavy trucks and buses: large pick-ups, 
+# delivery trucks, recreational vehicles (RVs), and semi trucks.
+# See http://www.epa.gov/otaq/standards/basicinfo.htm
+
+# R Packages required for the running of this script
+# Base
+# ggplot2
+# plyr
+library(ggplot2)
+library(plyr)
+
+# If a directory has not been created to hold PM25 data, make one.
+if(!file.exists("PM25_Data")) {
+    dir.create("PM25_Data")
+}
+
+# Download zip file
+zipURL <- "https://d396qusza40orc.cloudfront.net/exdata%2Fdata%2FNEI_data.zip"
+download.file(zipURL,"./PM25_Data/temp",method = "curl")
+
+# unzip zip file
+unzip("./PM25_Data/temp", exdir = "./PM25_Data/")
+# Delete zip file
+unlink("./PM25_Data/temp")
+
+# Read data frames from files
+NEI <- readRDS("./PM25_Data/SummarySCC_PM25.rds")
+SCC <- readRDS("./PM25_Data/Source_Classification_Code.rds")
+
+# subset data by fips == "24510 to isolate all records for Baltimore City, Maryland
+baltimore <- NEI[NEI$fips == "24510",]
+
+# subset data by fips = "06037" to isolate all records for Los Angeles County
+laCounty <- NEI[NEI$fips == "06037",]
+
+# Convert year to a factor for each data frame
+baltimore$year <- as.factor(as.character(baltimore$year))
+laCounty$year <- as.factor(as.character(laCounty$year))
+
+# Subset SCC$SCC uding grepl() to isolate those SCCs 
+# that fall into each of the following four categories
+# 1) Mobile - On-Road Gasoline Light Duty Vehicles
+# 2) Mobile - On-Road Diesel Light Duty Vehicles
+# 3) Mobile - On-Road Gasoline Heavy Duty Vehicles
+# 4) Mobile - On-Road Diesel Heavy Duty Vehicles
+SCCs <- SCC$SCC[grepl("On-Road Gasoline Light Duty Vehicles", SCC$EI.Sector) | 
+                    grepl("On-Road Diesel Light Duty Vehicles", SCC$EI.Sector) | 
+                    grepl("On-Road Gasoline Heavy Duty Vehicles", SCC$EI.Sector) |
+                    grepl("On-Road Diesel Heavy Duty Vehicles", SCC$EI.Sector)]
+
+# Use vector containing the four categories of SCCs to subest baltimore dataframe.
+allMVsBaltimore <- baltimore[baltimore$SCC %in% SCCs,]
+# add City column to allMVsBaltimore dataframe
+allMVsBaltimore$City <- rep("Baltimore City", length(allMVsBaltimore$SCC))
+
+# Use vector containing the four categories of SCCs to subest la county dataframe
+allMVslaCounty <- laCounty[laCounty$SCC %in% SCCs,]
+# add City column to allMVslaCounty dataframe
+allMVslaCounty$City <- rep("LA County", length(allMVslaCounty$SCC))
+
+# Merge data frames with rbind
+allMVs <- rbind(allMVsBaltimore, allMVslaCounty)
+
+# Split data frame by year and Region
+# and calculate the following statistics for each group
+# 1) total emissions
+mvStatsYearRegion <- ddply(allMVs,c("year","City"), summarise,
+                           Total_Emissions = sum(Emissions))
+
+# Log transformation of total emissions
+mvStatsYearRegion$Ln_Total_Emissions <- log10(mvStatsYearRegion$Total_Emissions)
+
+# Generate log emissions plot with regression lines 
+grob <- ggplot(mvStatsYearRegion, aes(x = year, y = Ln_Total_Emissions, group = City, linetype = City)) +
+    geom_line() + geom_point() +
+    stat_smooth(method = lm) +
+    labs(title = expression(atop('Total PM'[2.5]*' Motor Vehicle Emissions',
+                                 paste('for Baltimore City and Los Angeles County'))),
+         y =  expression('Log'[10]*' of Total PM'[2.5]*' Emissions in log(Tons)'), x = "Year", 
+         fill = "City") +
+    theme(plot.title = element_text(hjust = 0.5))
+
+# Launch graphics device for png-formatted files
+png("plot6.png")
+# write graph to png file
+print(grob)
+# Close graphics device
+dev.off()
