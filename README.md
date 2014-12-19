@@ -8,16 +8,21 @@ Explore the National Emissions Inventory database and see what it says about fin
 particulate matter pollution (PM2.5) in the United States over the 10-year period   
 1999–2008.
 
-##Datasets Used in Analysis:
-**PM2.5 Emissions Data (summarySCC_PM25.rds)**
+Six R scripts were written to written to generate plots addressing six questions  
+posed by Dr. Peng regarding the emissions data. scripts can be run independently   
+of each other as code for downloading the data for analysis is included in each   
+script. 
+
+##Contents of this repository
+###Datasets Used in Analysis:
+**./PM25_Data/summarySCC_PM25.rds**
 This file contains a data frame with all of the PM2.5 emissions data 
 for 1999, 2002, 2005, and 2008.
 
-**Source Classification Code Table (Source_Classification_Code.rds)**
+**./PM25_Data/Source_Classification_Code.rds**
 This table provides a mapping from the SCC digit strings in the Emissions 
-table to the actual name of the PM2.5 source.
+table to the actual name of the PM2.5 source.  
 
-##Contents of this repository
 ###plot1.R
 R script     
 Addresses whether emissions from PM2.5 decreased in the United States from    
